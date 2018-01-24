@@ -2,8 +2,10 @@
 
 namespace Corp\Exceptions;
 
+use Corp\Http\Controllers\SiteController;
 use Exception;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Support\Facades\Log;
 
 class Handler extends ExceptionHandler
 {
@@ -31,7 +33,7 @@ class Handler extends ExceptionHandler
      *
      * This is a great spot to send exceptions to Sentry, Bugsnag, etc.
      *
-     * @param  \Exception  $exception
+     * @param  \Exception $exception
      * @return void
      */
     public function report(Exception $exception)
@@ -42,12 +44,32 @@ class Handler extends ExceptionHandler
     /**
      * Render an exception into an HTTP response.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Exception  $exception
+     * @param  \Illuminate\Http\Request $request
+     * @param  \Exception $exception
      * @return \Illuminate\Http\Response
      */
     public function render($request, Exception $exception)
     {
+        if ($this->isHttpException($exception))
+        {
+            $statusCode = $exception->getStatusCode();
+
+            switch ($statusCode)
+            {
+                case '404';
+
+                    $obj = new \Corp\Http\Controllers\SiteController(new \Corp\Repositories\MenusRepository(new \Corp\Menu));
+
+                    $navigation = view(env('THEME') . '.navigation')
+                        ->with('menu', $obj->getMenu())->render();
+
+                    Log::alert('Страница не найдена - '.$request->url());
+
+                    return response()->view(env('THEME') . '.404',
+                        ['bar' => 'no', 'title' => 'Страница не найдена', 'navigation' => $navigation]);
+            }
+        }
+
         return parent::render($request, $exception);
     }
 }
